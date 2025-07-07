@@ -32,5 +32,7 @@ spec:
                 secretKeyRef:
                   name: {{ include "springboot-mysql.fullname" . }}-secret
                   key: DB_PASSWORD
+            - name: MYSQL_DATABASE
+              value: {{ .Values.mysql.database }}
           ports:
             - containerPort: {{ .Values.service.port }}

@@ -1,0 +1,193 @@
+Chart.yaml:
+----------------
+apiVersion: v2
+name: springboot-mysql
+description: Helm chart for sprinboot web app with Mysql database
+version: 0.1.0
+appVersion: 1.0.0
+
+values.yaml:
+-------------
+namespace: app-namespace
+
+replicaCount: 2
+
+image:
+  repository: filekrafter95/springboot-mysql
+  tag: 1.0.0
+  pullPolicy: IfNotPresent
+
+mysql:
+  image: mysql:8
+  rootPassword: myrootpass
+  database: appdb
+  user: appuser
+  password: appuserpass
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: true
+  host: springboot.local
+
+config:
+  appName: SpringBootHelmApp
+
+-helper.tpl:
+---------------
+
+{{- define "springboot-mysql.fullname" -}}
+{{ .Release.Name }}-{{ .Chart.Name }}
+{{- end }}
+
+configmp.yaml:
+--------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "springboot-mysql.fullname" . }}-config
+  namespace: {{ .Values.namespace }}
+data:
+  APP_NAME: "{{ .Values.config.appName }}"
+
+Deployment.yaml
+-----------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "springboot-mysql.fullname" . }}-app
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "springboot-mysql.fullname" . }}-app
+  template:
+    metadata:
+      labels:
+        app: {{ include "springboot-mysql.fullname" . }}-app
+    spec:
+      containers:
+        - name: app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: APP_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "springboot-mysql.fullname" . }}-config
+                  key: APP_NAME
+            - name: DB_HOST
+              value: {{ include "springboot-mysql.fullname" . }}-mysql
+            - name: DB_USER
+              value: {{ .Values.mysql.user }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "springboot-mysql.fullname" . }}-secret
+                  key: DB_PASSWORD
+          ports:
+            - containerPort: {{ .Values.service.port }}
+
+ingress.yaml:
+---------------
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "springboot-mysql.fullname" . }}-ingress
+  namespace: {{ .Values.namespace }}
+spec:
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "springboot-mysql.fullname" . }}-app
+                port:
+                  number: {{ .Values.service.port }}
+{{- end }}
+
+mysql_deplyment.yaml:
+=----------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "springboot-mysql.fullname" . }}-mysql
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "springboot-mysql.fullname" . }}-mysql
+  template:
+    metadata:
+      labels:
+        app: {{ include "springboot-mysql.fullname" . }}-mysql
+    spec:
+      containers:
+        - name: mysql
+          image: {{ .Values.mysql.image }}
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: {{ .Values.mysql.rootPassword }}
+            - name: MYSQL_DATABASE
+              value: {{ .Values.mysql.database }}
+            - name: MYSQL_USER
+              value: {{ .Values.mysql.user }}
+            - name: MYSQL_PASSWORD
+              value: {{ .Values.mysql.password }}
+          ports:
+            - containerPort: 3306
+
+mysql-service.yaml:
+-----------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "springboot-mysql.fullname" . }}-mysql
+  namespace: {{ .Values.namespace }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3306
+  selector:
+    app: {{ include "springboot-mysql.fullname" . }}-mysql
+
+namespace.yaml:
+------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace }}
+  
+secret.yaml:
+--------------
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "springboot-mysql.fullname" . }}-secret
+  namespace: {{ .Values.namespace }}
+type: Opaque
+stringData:
+  DB_PASSWORD: "{{ .Values.mysql.password }}"
+
+service.yaml:
+------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "springboot-mysql.fullname" . }}-app
+  namespace: {{ .Values.namespace }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.port }}
+  selector:
+    app: {{ include "springboot-mysql.fullname" . }}-app
