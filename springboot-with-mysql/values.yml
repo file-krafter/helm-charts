@@ -1,0 +1,26 @@
+namespace: app-namespace
+
+replicaCount: 2
+
+image:
+  repository: filekrafter95/springboot-mysql
+  tag: 1.0.0
+  pullPolicy: IfNotPresent
+
+mysql:
+  image: mysql:8
+  rootPassword: myrootpass
+  database: appdb
+  user: appuser
+  password: appuserpass
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: true
+  host: springboot.local
+
+config:
+  appName: SpringBootHelmApp

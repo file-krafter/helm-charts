@@ -1,0 +1,5 @@
+apiVersion: v2
+name: springboot-mysql
+description: Helm chart for sprinboot web app with Mysql database
+version: 0.1.0
+appVersion: 1.0.0

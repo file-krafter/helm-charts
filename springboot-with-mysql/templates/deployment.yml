@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "springboot-mysql.fullname" . }}-app
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "springboot-mysql.fullname" . }}-app
+  template:
+    metadata:
+      labels:
+        app: {{ include "springboot-mysql.fullname" . }}-app
+    spec:
+      containers:
+        - name: app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: APP_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "springboot-mysql.fullname" . }}-config
+                  key: APP_NAME
+            - name: DB_HOST
+              value: {{ include "springboot-mysql.fullname" . }}-mysql
+            - name: DB_USER
+              value: {{ .Values.mysql.user }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "springboot-mysql.fullname" . }}-secret
+                  key: DB_PASSWORD
+          ports:
+            - containerPort: {{ .Values.service.port }}
