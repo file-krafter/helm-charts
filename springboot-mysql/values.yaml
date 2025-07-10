@@ -21,6 +21,7 @@ service:
 ingress:
   enabled: true
   host: springboot.local
+  className: nginx
 
 config:
   appName: SpringBootHelmApp
